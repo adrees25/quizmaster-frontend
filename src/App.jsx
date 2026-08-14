@@ -3,6 +3,12 @@ import { useState, useEffect } from "react";
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 
 /* =========================
+   BACKEND URL
+========================= */
+
+const API_URL = "http://localhost:5000";
+
+/* =========================
    QUIZ DATA
 ========================= */
 
@@ -126,7 +132,7 @@ const dbmsQuestions = [
 ];
 
 /* =========================
-   FISHER-YATES SHUFFLE
+   SHUFFLE
 ========================= */
 
 function shuffleArray(array) {
@@ -145,7 +151,7 @@ function shuffleArray(array) {
 }
 
 /* =========================
-   AUTOMATIC QUIZ STATISTICS
+   QUIZ DATA
 ========================= */
 
 const quizData = [
@@ -208,11 +214,15 @@ function Home() {
 
           <div className="buttons">
             <a href="/quizzes">
-              <button className="primary-btn">Start Quiz</button>
+              <button className="primary-btn">
+                Start Quiz
+              </button>
             </a>
 
             <a href="/login">
-              <button className="secondary-btn">Login</button>
+              <button className="secondary-btn">
+                Login
+              </button>
             </a>
           </div>
         </div>
@@ -243,10 +253,53 @@ function Home() {
 ========================= */
 
 function Login() {
-  const handleLogin = (e) => {
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    window.location.href = "/dashboard";
+    const form = e.target;
+
+    const email = form[0].value.trim();
+    const password = form[1].value;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Login failed");
+        return;
+      }
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(data.user)
+      );
+
+      alert("Login successful!");
+
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Login Error:", error);
+
+      alert(
+        "Backend se connection nahi ho raha. Make sure server is running."
+      );
+    }
   };
 
   return (
@@ -281,7 +334,10 @@ function Login() {
             />
           </div>
 
-          <button type="submit" className="login-btn">
+          <button
+            type="submit"
+            className="login-btn"
+          >
             Login
           </button>
         </form>
@@ -300,10 +356,55 @@ function Login() {
 ========================= */
 
 function Register() {
-  const handleRegister = (e) => {
+  const navigate = useNavigate();
+
+  const handleRegister = async (e) => {
     e.preventDefault();
 
-    window.location.href = "/login";
+    const form = e.target;
+
+    const name = form[0].value.trim();
+    const email = form[1].value.trim();
+    const password = form[2].value;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/register`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(
+          data.message || "Registration failed"
+        );
+        return;
+      }
+
+      alert("Registration successful!");
+
+      navigate("/login");
+    } catch (error) {
+      console.error(
+        "Registration Error:",
+        error
+      );
+
+      alert(
+        "Backend se connection nahi ho raha. Make sure server is running."
+      );
+    }
   };
 
   return (
@@ -314,7 +415,8 @@ function Register() {
         <h1>Create Account</h1>
 
         <p className="login-subtitle">
-          Join QuizMaster and start testing your knowledge
+          Join QuizMaster and start testing your
+          knowledge
         </p>
 
         <form onSubmit={handleRegister}>
@@ -344,11 +446,15 @@ function Register() {
             <input
               type="password"
               placeholder="Create a password"
+              minLength="6"
               required
             />
           </div>
 
-          <button type="submit" className="login-btn">
+          <button
+            type="submit"
+            className="login-btn"
+          >
             Create Account
           </button>
         </form>
@@ -371,17 +477,31 @@ function Dashboard() {
     localStorage.getItem("quizResults") || "[]"
   );
 
+  const user = JSON.parse(
+    localStorage.getItem("user") || "null"
+  );
+
   const completedQuizzes = quizResults.length;
 
   const averageScore =
     completedQuizzes > 0
       ? Math.round(
           quizResults.reduce(
-            (sum, result) => sum + result.percentage,
+            (sum, result) =>
+              sum + result.percentage,
             0
           ) / completedQuizzes
         )
       : 0;
+
+  const logout = () => {
+    localStorage.removeItem("user");
+    navigateTo("/");
+  };
+
+  const navigateTo = (path) => {
+    window.location.href = path;
+  };
 
   return (
     <div className="dashboard">
@@ -391,16 +511,32 @@ function Dashboard() {
         <div className="nav-links">
           <a href="/dashboard">Dashboard</a>
           <a href="/quizzes">Quizzes</a>
-          <a href="/leaderboard">Leaderboard</a>
-          <a href="/">Logout</a>
+          <a href="/leaderboard">
+            Leaderboard
+          </a>
+          <button
+            onClick={logout}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            Logout
+          </button>
         </div>
       </nav>
 
       <div className="dashboard-content">
-        <h1>Welcome back, Student! 👋</h1>
+        <h1>
+          Welcome back,{" "}
+          {user?.name || "Student"}! 👋
+        </h1>
 
         <p className="dashboard-subtitle">
-          Test your knowledge and improve your skills.
+          Test your knowledge and improve your
+          skills.
         </p>
 
         <div className="dashboard-stats">
@@ -433,10 +569,13 @@ function Dashboard() {
               <h3>{quiz.name} Quiz</h3>
 
               <p>
-                {quiz.questions.length} questions available.
+                {quiz.questions.length} questions
+                available.
               </p>
 
-              <a href={`/quiz?type=${quiz.type}`}>
+              <a
+                href={`/quiz?type=${quiz.type}`}
+              >
                 <button>Start Quiz</button>
               </a>
             </div>
@@ -464,15 +603,13 @@ function Quiz() {
       (quiz) => quiz.type === quizType
     ) || quizData[0];
 
-  /* =========================
-     SHUFFLE QUESTIONS + OPTIONS
-  ========================= */
-
   const [questions] = useState(() =>
-    shuffleArray(selectedQuiz.questions).map((q) => ({
-      ...q,
-      options: shuffleArray(q.options),
-    }))
+    shuffleArray(selectedQuiz.questions).map(
+      (q) => ({
+        ...q,
+        options: shuffleArray(q.options),
+      })
+    )
   );
 
   const [currentQuestion, setCurrentQuestion] =
@@ -487,10 +624,6 @@ function Quiz() {
   const question =
     questions[currentQuestion];
 
-  /* =========================
-     TIMER
-  ========================= */
-
   useEffect(() => {
     if (timeLeft <= 0) {
       finishQuiz();
@@ -503,10 +636,6 @@ function Quiz() {
 
     return () => clearInterval(timer);
   }, [timeLeft]);
-
-  /* =========================
-     FINISH QUIZ
-  ========================= */
 
   const finishQuiz = () => {
     let finalScore = 0;
@@ -522,15 +651,14 @@ function Quiz() {
 
     const total = questions.length;
 
-    const percentage =
-      Math.round(
-        (finalScore / total) * 100
-      );
+    const percentage = Math.round(
+      (finalScore / total) * 100
+    );
 
-    const oldResults =
-      JSON.parse(
-        localStorage.getItem("quizResults") || "[]"
-      );
+    const oldResults = JSON.parse(
+      localStorage.getItem("quizResults") ||
+        "[]"
+    );
 
     oldResults.push({
       quizType,
@@ -548,18 +676,11 @@ function Quiz() {
       `/result?score=${finalScore}&total=${total}`;
   };
 
-  /* =========================
-     NEXT QUESTION
-  ========================= */
-
   const nextQuestion = () => {
-    if (
-      !selectedAnswers[currentQuestion]
-    ) {
+    if (!selectedAnswers[currentQuestion]) {
       alert(
         "Please select an answer first!"
       );
-
       return;
     }
 
@@ -574,10 +695,6 @@ function Quiz() {
       finishQuiz();
     }
   };
-
-  /* =========================
-     PREVIOUS QUESTION
-  ========================= */
 
   const previousQuestion = () => {
     if (currentQuestion > 0) {
@@ -596,21 +713,18 @@ function Quiz() {
 
         <div className="timer">
           ⏱{" "}
-          {Math.floor(
-            timeLeft / 60
+          {Math.floor(timeLeft / 60)}:
+          {String(timeLeft % 60).padStart(
+            2,
+            "0"
           )}
-          :
-          {String(
-            timeLeft % 60
-          ).padStart(2, "0")}
         </div>
       </div>
 
       <div className="quiz-container">
         <p className="question-number">
-          Question{" "}
-          {currentQuestion + 1}{" "}
-          of {questions.length}
+          Question {currentQuestion + 1} of{" "}
+          {questions.length}
         </p>
 
         <h1 className="question">
@@ -663,9 +777,7 @@ function Quiz() {
 
           <button
             className="next-btn"
-            onClick={
-              nextQuestion
-            }
+            onClick={nextQuestion}
           >
             {currentQuestion ===
             questions.length - 1
@@ -708,8 +820,7 @@ function Result() {
       ? location.state?.total ?? 0
       : totalFromUrl;
 
-  const wrong =
-    total - score;
+  const wrong = total - score;
 
   const percentage =
     total > 0
@@ -725,9 +836,7 @@ function Result() {
           🏆
         </div>
 
-        <h1>
-          Quiz Completed!
-        </h1>
+        <h1>Quiz Completed!</h1>
 
         <p className="result-message">
           Great job! Here is your result.
@@ -743,33 +852,18 @@ function Result() {
 
         <div className="result-details">
           <div>
-            <strong>
-              {score}
-            </strong>
-
-            <span>
-              Correct
-            </span>
+            <strong>{score}</strong>
+            <span>Correct</span>
           </div>
 
           <div>
-            <strong>
-              {wrong}
-            </strong>
-
-            <span>
-              Wrong
-            </span>
+            <strong>{wrong}</strong>
+            <span>Wrong</span>
           </div>
 
           <div>
-            <strong>
-              {percentage}%
-            </strong>
-
-            <span>
-              Percentage
-            </span>
+            <strong>{percentage}%</strong>
+            <span>Percentage</span>
           </div>
         </div>
 
@@ -796,7 +890,7 @@ function Result() {
 }
 
 /* =========================
-   QUIZZES PAGE
+   QUIZZES
 ========================= */
 
 function Quizzes() {
@@ -825,36 +919,32 @@ function Quizzes() {
       </nav>
 
       <div className="dashboard-content">
-        <h1>
-          Available Quizzes
-        </h1>
+        <h1>Available Quizzes</h1>
 
         <div className="quiz-cards">
-          {quizData.map(
-            (quiz) => (
-              <div
-                className="quiz-card"
-                key={quiz.type}
+          {quizData.map((quiz) => (
+            <div
+              className="quiz-card"
+              key={quiz.type}
+            >
+              <h3>
+                {quiz.name} Quiz
+              </h3>
+
+              <p>
+                {quiz.questions.length}{" "}
+                questions
+              </p>
+
+              <a
+                href={`/quiz?type=${quiz.type}`}
               >
-                <h3>
-                  {quiz.name} Quiz
-                </h3>
-
-                <p>
-                  {quiz.questions.length}{" "}
-                  questions
-                </p>
-
-                <a
-                  href={`/quiz?type=${quiz.type}`}
-                >
-                  <button>
-                    Start Quiz
-                  </button>
-                </a>
-              </div>
-            )
-          )}
+                <button>
+                  Start Quiz
+                </button>
+              </a>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -881,9 +971,7 @@ function Leaderboard() {
         </div>
 
         <div className="nav-links">
-          <a href="/">
-            Home
-          </a>
+          <a href="/">Home</a>
 
           <a href="/quizzes">
             Quizzes
@@ -900,15 +988,11 @@ function Leaderboard() {
       </nav>
 
       <div className="dashboard-content">
-        <h1>
-          🏆 Leaderboard
-        </h1>
+        <h1>🏆 Leaderboard</h1>
 
         {quizResults.length === 0 ? (
           <div className="quiz-card">
-            <h3>
-              No results yet
-            </h3>
+            <h3>No results yet</h3>
 
             <p>
               Complete a quiz to see
