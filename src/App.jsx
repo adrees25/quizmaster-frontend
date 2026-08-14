@@ -6,8 +6,7 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
    BACKEND URL
 ========================= */
 
-const API_URL = "http://localhost:5000";
-
+const API_URL = "https://quizmaster-backend-g2mn.onrender.com";
 /* =========================
    QUIZ DATA
 ========================= */
