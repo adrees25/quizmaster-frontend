@@ -1,12 +1,62 @@
 import "./App.css";
-import { useState, useEffect } from "react";
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  Link,
+} from "react-router-dom";
 
 const API_URL = "https://quizmaster-backend-g2mn.onrender.com";
 
-// =========================
+// =====================================================
+// AUTH HELPERS
+// =====================================================
+
+function getUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function isLoggedIn() {
+  return !!localStorage.getItem("user");
+}
+
+// =====================================================
+// PROTECTED ROUTE
+// =====================================================
+
+function ProtectedRoute({ children }) {
+  const user = getUser();
+
+  if (!user) {
+    return <LoginRequired />;
+  }
+
+  return children;
+}
+
+// =====================================================
+// LOGIN REQUIRED
+// =====================================================
+
+function LoginRequired() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    navigate("/login", { replace: true });
+  }, [navigate]);
+
+  return null;
+}
+
+// =====================================================
 // QUIZ DATA
-// =========================
+// =====================================================
 
 const javascriptQuestions = [
   {
@@ -117,11 +167,16 @@ const dbmsQuestions = [
   },
 ];
 
+// =====================================================
+// HELPERS
+// =====================================================
+
 function shuffleArray(array) {
   const shuffled = [...array];
 
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
+
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
@@ -147,29 +202,67 @@ const quizData = [
 ];
 
 const totalQuizzes = quizData.length;
+
 const totalQuestions = quizData.reduce(
   (total, quiz) => total + quiz.questions.length,
   0
 );
+
 const totalCategories = quizData.length;
 
-// =========================
+// =====================================================
+// NAVBAR
+// =====================================================
+
+function Navbar() {
+  const navigate = useNavigate();
+  const user = getUser();
+
+  const logout = () => {
+    localStorage.removeItem("user");
+    navigate("/", { replace: true });
+  };
+
+  return (
+    <nav className="navbar">
+      <Link to="/" className="logo">
+        📝 QuizMaster
+      </Link>
+
+      <div className="nav-links">
+        <Link to="/">Home</Link>
+
+        {user ? (
+          <>
+            <Link to="/dashboard">Dashboard</Link>
+            <Link to="/quizzes">Quizzes</Link>
+            <Link to="/leaderboard">Leaderboard</Link>
+
+            <button className="nav-logout" onClick={logout}>
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
+          </>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+// =====================================================
 // HOME
-// =========================
+// =====================================================
 
 function Home() {
+  const user = getUser();
+
   return (
     <div className="app">
-      <nav className="navbar">
-        <div className="logo">📝 QuizMaster</div>
-
-        <div className="nav-links">
-          <a href="/">Home</a>
-          <a href="/quizzes">Quizzes</a>
-          <a href="/leaderboard">Leaderboard</a>
-          <a href="/login">Login</a>
-        </div>
-      </nav>
+      <Navbar />
 
       <section className="hero">
         <div className="hero-content">
@@ -180,18 +273,26 @@ function Home() {
           </h1>
 
           <p className="description">
-            Challenge yourself with interactive quizzes, improve your knowledge
-            and track your progress.
+            Challenge yourself with interactive quizzes, improve your
+            knowledge and track your progress.
           </p>
 
           <div className="buttons">
-            <a href="/quizzes">
-              <button className="primary-btn">Start Quiz</button>
-            </a>
+            {user ? (
+              <Link to="/quizzes">
+                <button className="primary-btn">Start Quiz</button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login">
+                  <button className="primary-btn">Login to Start</button>
+                </Link>
 
-            <a href="/login">
-              <button className="secondary-btn">Login</button>
-            </a>
+                <Link to="/register">
+                  <button className="secondary-btn">Create Account</button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -216,9 +317,9 @@ function Home() {
   );
 }
 
-// =========================
+// =====================================================
 // LOGIN
-// =========================
+// =====================================================
 
 function Login() {
   const navigate = useNavigate();
@@ -227,8 +328,9 @@ function Login() {
     e.preventDefault();
 
     const form = e.target;
-    const email = form[0].value.trim();
-    const password = form[1].value;
+
+    const email = form.email.value.trim();
+    const password = form.password.value;
 
     try {
       const response = await fetch(`${API_URL}/api/login`, {
@@ -236,7 +338,10 @@ function Login() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+        }),
       });
 
       const data = await response.json();
@@ -247,12 +352,17 @@ function Login() {
       }
 
       localStorage.setItem("user", JSON.stringify(data.user));
+
       alert("Login successful!");
-      navigate("/dashboard");
+
+      navigate("/dashboard", {
+        replace: true,
+      });
     } catch (error) {
       console.error("Login Error:", error);
+
       alert(
-        "Backend se connection nahi ho raha. Make sure backend is running."
+        "Backend se connection nahi ho raha. Render backend check karo."
       );
     }
   };
@@ -271,7 +381,9 @@ function Login() {
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Email Address</label>
+
             <input
+              name="email"
               type="email"
               placeholder="Enter your email"
               required
@@ -280,7 +392,9 @@ function Login() {
 
           <div className="form-group">
             <label>Password</label>
+
             <input
+              name="password"
               type="password"
               placeholder="Enter your password"
               required
@@ -293,16 +407,17 @@ function Login() {
         </form>
 
         <p className="register-text">
-          Don't have an account? <a href="/register">Register</a>
+          Don't have an account?{" "}
+          <Link to="/register">Register</Link>
         </p>
       </div>
     </div>
   );
 }
 
-// =========================
+// =====================================================
 // REGISTER
-// =========================
+// =====================================================
 
 function Register() {
   const navigate = useNavigate();
@@ -311,9 +426,10 @@ function Register() {
     e.preventDefault();
 
     const form = e.target;
-    const name = form[0].value.trim();
-    const email = form[1].value.trim();
-    const password = form[2].value;
+
+    const name = form.name.value.trim();
+    const email = form.email.value.trim();
+    const password = form.password.value;
 
     try {
       const response = await fetch(`${API_URL}/api/register`, {
@@ -321,7 +437,11 @@ function Register() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+        }),
       });
 
       const data = await response.json();
@@ -332,11 +452,15 @@ function Register() {
       }
 
       alert("Registration successful!");
-      navigate("/login");
+
+      navigate("/login", {
+        replace: true,
+      });
     } catch (error) {
       console.error("Registration Error:", error);
+
       alert(
-        "Backend se connection nahi ho raha. Make sure backend is running."
+        "Backend se connection nahi ho raha. Render backend check karo."
       );
     }
   };
@@ -355,7 +479,9 @@ function Register() {
         <form onSubmit={handleRegister}>
           <div className="form-group">
             <label>Full Name</label>
+
             <input
+              name="name"
               type="text"
               placeholder="Enter your full name"
               required
@@ -364,7 +490,9 @@ function Register() {
 
           <div className="form-group">
             <label>Email Address</label>
+
             <input
+              name="email"
               type="email"
               placeholder="Enter your email"
               required
@@ -373,7 +501,9 @@ function Register() {
 
           <div className="form-group">
             <label>Password</label>
+
             <input
+              name="password"
               type="password"
               placeholder="Create a password"
               minLength={6}
@@ -387,23 +517,24 @@ function Register() {
         </form>
 
         <p className="register-text">
-          Already have an account? <a href="/login">Login</a>
+          Already have an account?{" "}
+          <Link to="/login">Login</Link>
         </p>
       </div>
     </div>
   );
 }
 
-// =========================
+// =====================================================
 // DASHBOARD
-// =========================
+// =====================================================
 
 function Dashboard() {
+  const user = getUser();
+
   const quizResults = JSON.parse(
     localStorage.getItem("quizResults") || "[]"
   );
-
-  const user = JSON.parse(localStorage.getItem("user") || "null");
 
   const completedQuizzes = quizResults.length;
 
@@ -417,36 +548,14 @@ function Dashboard() {
         )
       : 0;
 
-  const logout = () => {
-    localStorage.removeItem("user");
-    window.location.href = "/";
-  };
-
   return (
     <div className="dashboard">
-      <nav className="navbar">
-        <div className="logo">📝 QuizMaster</div>
-
-        <div className="nav-links">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/quizzes">Quizzes</a>
-          <a href="/leaderboard">Leaderboard</a>
-          <button
-            onClick={logout}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              font: "inherit",
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="dashboard-content">
-        <h1>Welcome back, {user?.name || "Student"}! 👋</h1>
+        <h1>
+          Welcome back, {user?.name || "Student"}! 👋
+        </h1>
 
         <p className="dashboard-subtitle">
           Test your knowledge and improve your skills.
@@ -478,9 +587,9 @@ function Dashboard() {
 
               <p>{quiz.questions.length} questions available.</p>
 
-              <a href={`/quiz?type=${quiz.type}`}>
+              <Link to={`/quiz?type=${quiz.type}`}>
                 <button>Start Quiz</button>
-              </a>
+              </Link>
             </div>
           ))}
         </div>
@@ -489,44 +598,72 @@ function Dashboard() {
   );
 }
 
-// =========================
+// =====================================================
 // QUIZ
-// =========================
+// =====================================================
 
 function Quiz() {
-  const params = new URLSearchParams(window.location.search);
+  const navigate = useNavigate();
+
+  const location = useLocation();
+
+  const params = new URLSearchParams(location.search);
+
   const quizType = params.get("type") || "javascript";
 
   const selectedQuiz =
     quizData.find((quiz) => quiz.type === quizType) || quizData[0];
 
   const [questions] = useState(() =>
-    shuffleArray(selectedQuiz.questions).map((q) => ({
-      ...q,
-      options: shuffleArray(q.options),
+    shuffleArray(selectedQuiz.questions).map((question) => ({
+      ...question,
+      options: shuffleArray(question.options),
     }))
   );
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
+
   const [timeLeft, setTimeLeft] = useState(600);
+
   const [selectedAnswers, setSelectedAnswers] = useState({});
+
+  const [submitted, setSubmitted] = useState(false);
 
   const question = questions[currentQuestion];
 
+  // ---------------------------------------------
+  // TIMER
+  // ---------------------------------------------
+
   useEffect(() => {
-    if (timeLeft <= 0) {
+    if (timeLeft <= 0 && !submitted) {
       finishQuiz();
       return;
     }
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, submitted]);
+
+  // ---------------------------------------------
+  // FINISH QUIZ
+  // ---------------------------------------------
 
   const finishQuiz = () => {
+    if (submitted) return;
+
+    setSubmitted(true);
+
     let finalScore = 0;
 
     questions.forEach((q, index) => {
@@ -536,7 +673,9 @@ function Quiz() {
     });
 
     const total = questions.length;
-    const percentage = Math.round((finalScore / total) * 100);
+
+    const percentage =
+      total > 0 ? Math.round((finalScore / total) * 100) : 0;
 
     const oldResults = JSON.parse(
       localStorage.getItem("quizResults") || "[]"
@@ -547,12 +686,25 @@ function Quiz() {
       score: finalScore,
       total,
       percentage,
+      date: new Date().toISOString(),
     });
 
-    localStorage.setItem("quizResults", JSON.stringify(oldResults));
+    localStorage.setItem(
+      "quizResults",
+      JSON.stringify(oldResults)
+    );
 
-    window.location.href = `/result?score=${finalScore}&total=${total}`;
+    navigate(
+      `/result?score=${finalScore}&total=${total}`,
+      {
+        replace: true,
+      }
+    );
   };
+
+  // ---------------------------------------------
+  // NEXT
+  // ---------------------------------------------
 
   const nextQuestion = () => {
     if (!selectedAnswers[currentQuestion]) {
@@ -566,6 +718,10 @@ function Quiz() {
       finishQuiz();
     }
   };
+
+  // ---------------------------------------------
+  // PREVIOUS
+  // ---------------------------------------------
 
   const previousQuestion = () => {
     if (currentQuestion > 0) {
@@ -589,7 +745,9 @@ function Quiz() {
           Question {currentQuestion + 1} of {questions.length}
         </p>
 
-        <h1 className="question">{question.question}</h1>
+        <h1 className="question">
+          {question.question}
+        </h1>
 
         <div className="options">
           {question.options.map((option, index) => (
@@ -598,7 +756,9 @@ function Quiz() {
                 type="radio"
                 name="answer"
                 value={option}
-                checked={selectedAnswers[currentQuestion] === option}
+                checked={
+                  selectedAnswers[currentQuestion] === option
+                }
                 onChange={(e) => {
                   setSelectedAnswers((prev) => ({
                     ...prev,
@@ -621,7 +781,10 @@ function Quiz() {
             Previous
           </button>
 
-          <button className="next-btn" onClick={nextQuestion}>
+          <button
+            className="next-btn"
+            onClick={nextQuestion}
+          >
             {currentQuestion === questions.length - 1
               ? "Submit Quiz"
               : "Next"}
@@ -632,28 +795,22 @@ function Quiz() {
   );
 }
 
-// =========================
+// =====================================================
 // RESULT
-// =========================
+// =====================================================
 
 function Result() {
   const navigate = useNavigate();
+
   const location = useLocation();
 
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(location.search);
 
-  const scoreFromUrl = Number(params.get("score"));
-  const totalFromUrl = Number(params.get("total"));
+  const score = Number(params.get("score")) || 0;
 
-  const score = Number.isNaN(scoreFromUrl)
-    ? location.state?.score ?? 0
-    : scoreFromUrl;
+  const total = Number(params.get("total")) || 0;
 
-  const total = Number.isNaN(totalFromUrl)
-    ? location.state?.total ?? 0
-    : totalFromUrl;
-
-  const wrong = total - score;
+  const wrong = Math.max(total - score, 0);
 
   const percentage =
     total > 0 ? Math.round((score / total) * 100) : 0;
@@ -694,7 +851,10 @@ function Result() {
           </div>
         </div>
 
-        <button className="next-btn" onClick={() => navigate("/quizzes")}>
+        <button
+          className="next-btn"
+          onClick={() => navigate("/quizzes")}
+        >
           Try Again
         </button>
 
@@ -709,26 +869,21 @@ function Result() {
   );
 }
 
-// =========================
+// =====================================================
 // QUIZZES
-// =========================
+// =====================================================
 
 function Quizzes() {
   return (
     <div className="dashboard">
-      <nav className="navbar">
-        <div className="logo">📝 QuizMaster</div>
-
-        <div className="nav-links">
-          <a href="/">Home</a>
-          <a href="/quizzes">Quizzes</a>
-          <a href="/leaderboard">Leaderboard</a>
-          <a href="/login">Login</a>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="dashboard-content">
         <h1>Available Quizzes</h1>
+
+        <p className="dashboard-subtitle">
+          Choose a quiz and test your knowledge.
+        </p>
 
         <div className="quiz-cards">
           {quizData.map((quiz) => (
@@ -737,9 +892,9 @@ function Quizzes() {
 
               <p>{quiz.questions.length} questions</p>
 
-              <a href={`/quiz?type=${quiz.type}`}>
+              <Link to={`/quiz?type=${quiz.type}`}>
                 <button>Start Quiz</button>
-              </a>
+              </Link>
             </div>
           ))}
         </div>
@@ -748,50 +903,54 @@ function Quizzes() {
   );
 }
 
-// =========================
+// =====================================================
 // LEADERBOARD
-// =========================
+// =====================================================
 
 function Leaderboard() {
   const quizResults = JSON.parse(
     localStorage.getItem("quizResults") || "[]"
   );
 
+  const sortedResults = [...quizResults].sort(
+    (a, b) => b.percentage - a.percentage
+  );
+
   return (
     <div className="dashboard">
-      <nav className="navbar">
-        <div className="logo">📝 QuizMaster</div>
-
-        <div className="nav-links">
-          <a href="/">Home</a>
-          <a href="/quizzes">Quizzes</a>
-          <a href="/leaderboard">Leaderboard</a>
-          <a href="/login">Login</a>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="dashboard-content">
         <h1>🏆 Leaderboard</h1>
 
-        {quizResults.length === 0 ? (
+        <p className="dashboard-subtitle">
+          Your completed quiz results.
+        </p>
+
+        {sortedResults.length === 0 ? (
           <div className="quiz-card">
             <h3>No results yet</h3>
 
-            <p>Complete a quiz to see your score here.</p>
+            <p>
+              Complete a quiz to see your score here.
+            </p>
           </div>
         ) : (
           <div className="quiz-cards">
-            {quizResults.map((result, index) => (
+            {sortedResults.map((result, index) => (
               <div className="quiz-card" key={index}>
                 <h3>
-                  #{index + 1} {result.quizType}
+                  #{index + 1}{" "}
+                  {result.quizType}
                 </h3>
 
                 <p>
                   Score: {result.score}/{result.total}
                 </p>
 
-                <p>Percentage: {result.percentage}%</p>
+                <p>
+                  Percentage: {result.percentage}%
+                </p>
               </div>
             ))}
           </div>
@@ -801,21 +960,68 @@ function Leaderboard() {
   );
 }
 
-// =========================
+// =====================================================
 // APP ROUTES
-// =========================
+// =====================================================
 
 function App() {
   return (
     <Routes>
+      {/* PUBLIC */}
       <Route path="/" element={<Home />} />
+
       <Route path="/login" element={<Login />} />
+
       <Route path="/register" element={<Register />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/quiz" element={<Quiz />} />
-      <Route path="/result" element={<Result />} />
-      <Route path="/quizzes" element={<Quizzes />} />
-      <Route path="/leaderboard" element={<Leaderboard />} />
+
+      {/* PROTECTED */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/quizzes"
+        element={
+          <ProtectedRoute>
+            <Quizzes />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/quiz"
+        element={
+          <ProtectedRoute>
+            <Quiz />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/result"
+        element={
+          <ProtectedRoute>
+            <Result />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/leaderboard"
+        element={
+          <ProtectedRoute>
+            <Leaderboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* FALLBACK */}
+      <Route path="*" element={<Home />} />
     </Routes>
   );
 }
